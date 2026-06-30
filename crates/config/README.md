@@ -74,3 +74,15 @@ supported, this means that `FOUNDRY_SRC` and `DAPP_SRC` are equivalent.
 Some exceptions to the above are [explicitly ignored](https://github.com/foundry-rs/foundry/blob/10440422e63aae660104e079dfccd5b0ae5fd720/config/src/lib.rs#L1539-L15522) due to security concerns.
 
 Environment variables take precedence over values in `foundry.toml`. Values are parsed as a loose form of TOML syntax.
+
+### `FOUNDRY_DISABLE_EXTERNAL_CHEATCODES`
+
+Setting `FOUNDRY_DISABLE_EXTERNAL_CHEATCODES` to a truthy value (`1` or `true`) forces all "external"
+cheatcodes — those that reach outside the EVM sandbox to the host — to revert instead of executing.
+This covers the `Filesystem` group (`ffi`, file I/O, prompts, on-disk artifact and code reads) and the
+`Environment` group (env var reads and writes).
+
+Unlike most settings, this flag is read directly from the environment and is **not** part of the
+configuration layering: it cannot be set or overridden through `foundry.toml`. In particular, it takes
+effect even when `ffi = true` is configured or `--ffi` is passed, so it can be used to sandbox test
+execution from the host.

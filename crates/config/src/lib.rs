@@ -978,7 +978,14 @@ impl Config {
             .merge(EtherscanEnvProvider::default())
             .merge(
                 Env::prefixed("FOUNDRY_")
-                    .ignore(&["PROFILE", "REMAPPINGS", "LIBRARIES", "FFI", "FS_PERMISSIONS"])
+                    .ignore(&[
+                        "PROFILE",
+                        "REMAPPINGS",
+                        "LIBRARIES",
+                        "FFI",
+                        "FS_PERMISSIONS",
+                        "DISABLE_EXTERNAL_CHEATCODES",
+                    ])
                     .map(|key| {
                         let key = key.as_str();
                         if Self::STANDALONE_SECTIONS.iter().any(|section| {

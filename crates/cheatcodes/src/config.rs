@@ -13,6 +13,23 @@ use std::{
     time::Duration,
 };
 
+/// Environment variable that, when set to a truthy value (`1` or `true`), forces external
+/// cheatcodes to revert instead of executing.
+///
+/// "External" here means cheatcodes that reach outside the EVM sandbox to the host: the
+/// [`Filesystem`](spec::Group::Filesystem) group (`ffi`, file I/O, prompts, on-disk artifact and
+/// code reads) and the [`Environment`](spec::Group::Environment) group (env var reads and writes).
+///
+/// This is read directly from the process environment and is intentionally *not* part of the
+/// figment config layering, so it cannot be overridden or re-enabled via `foundry.toml`.
+pub const DISABLE_EXTERNAL_CHEATCODES_ENV: &str = "FOUNDRY_DISABLE_EXTERNAL_CHEATCODES";
+
+/// Reads [`DISABLE_EXTERNAL_CHEATCODES_ENV`] from the process environment.
+fn external_cheatcodes_disabled_from_env() -> bool {
+    std::env::var(DISABLE_EXTERNAL_CHEATCODES_ENV)
+        .is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+}
+
 /// Additional, configurable context the `Cheatcodes` inspector has access to
 ///
 /// This is essentially a subset of various `Config` settings `Cheatcodes` needs to know.
@@ -20,6 +37,12 @@ use std::{
 pub struct CheatsConfig {
     /// Whether the FFI cheatcode is enabled.
     pub ffi: bool,
+    /// Whether external cheatcodes (the `Filesystem` and `Environment` groups) are disabled and
+    /// must revert instead of executing.
+    ///
+    /// Controlled exclusively by the [`DISABLE_EXTERNAL_CHEATCODES_ENV`] environment variable; it
+    /// is not configurable via `foundry.toml`.
+    pub disable_external_cheatcodes: bool,
     /// Use the create 2 factory in all cases including tests and non-broadcasting scripts.
     pub always_use_create_2_factory: bool,
     /// Rewrite plain CREATE to CREATE2 for `forge script --batch`.
@@ -83,6 +106,7 @@ impl CheatsConfig {
 
         Self {
             ffi: evm_opts.ffi,
+            disable_external_cheatcodes: external_cheatcodes_disabled_from_env(),
             always_use_create_2_factory: evm_opts.always_use_create_2_factory,
             batch_rewrite_creates,
             prompt_timeout: Duration::from_secs(config.prompt_timeout),
@@ -226,6 +250,7 @@ impl Default for CheatsConfig {
     fn default() -> Self {
         Self {
             ffi: false,
+            disable_external_cheatcodes: false,
             always_use_create_2_factory: false,
             batch_rewrite_creates: false,
             prompt_timeout: Duration::from_secs(120),

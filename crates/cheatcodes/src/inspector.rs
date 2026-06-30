@@ -3058,6 +3058,26 @@ fn apply_dispatch<FEN: FoundryEvmNetwork>(
         ccx.state.deprecated.insert(cheatcode_signature(cheat), replacement);
     }
 
+    // External cheatcodes reach outside the EVM sandbox to the host (filesystem/OS and
+    // environment access). They can be disabled entirely via the
+    // `FOUNDRY_DISABLE_EXTERNAL_CHEATCODES` environment variable, e.g. to sandbox test execution.
+    // This gate is driven by the environment and cannot be re-enabled via `foundry.toml`.
+    if ccx.state.config.disable_external_cheatcodes
+        && let Some(kind) = match cheat.group {
+            spec::Group::Filesystem => Some("filesystem"),
+            spec::Group::Environment => Some("environment"),
+            _ => None,
+        }
+    {
+        // This early return skips the `vm.<name>: ` prefixing applied to dispatched errors below,
+        // so name the cheatcode explicitly here.
+        return Err(fmt_err!(
+            "external cheatcodes are disabled by `{}`: `vm.{}` accesses the {kind}",
+            crate::config::DISABLE_EXTERNAL_CHEATCODES_ENV,
+            cheatcode_name(cheat),
+        ));
+    }
+
     // Monomorphized dispatch: calls apply_full directly, no trait objects.
     macro_rules! dispatch {
         ($($variant:ident),*) => {
