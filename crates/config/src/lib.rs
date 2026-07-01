@@ -3153,6 +3153,8 @@ mod tests {
         });
     }
 
+    // `FOUNDRY_FFI` is ignored by the figment config layer, so it never reaches `Config::ffi`.
+    // The authoritative `FOUNDRY_FFI` override is applied separately in `CheatsConfig`.
     #[test]
     fn ffi_env_disallowed() {
         figment::Jail::expect_with(|jail| {

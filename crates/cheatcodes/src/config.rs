@@ -30,6 +30,24 @@ fn external_cheatcodes_disabled_from_env() -> bool {
         .is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true"))
 }
 
+/// Environment variable that authoritatively controls the FFI cheatcode.
+///
+/// When set to a boolean (`1`/`true` or `0`/`false`), it enables or disables FFI and takes
+/// precedence over both `foundry.toml` (`ffi = ...`) and the `--ffi` flag. Like
+/// [`DISABLE_EXTERNAL_CHEATCODES_ENV`], it is read directly from the process environment and is not
+/// part of the figment config layering, so it cannot be overridden via `foundry.toml`.
+pub const FFI_ENV: &str = "FOUNDRY_FFI";
+
+/// Reads [`FFI_ENV`] from the process environment, returning `None` when unset or not a recognized
+/// boolean so the configured value (`foundry.toml` / `--ffi`) is used instead.
+fn ffi_from_env() -> Option<bool> {
+    match std::env::var(FFI_ENV) {
+        Ok(v) if v == "1" || v.eq_ignore_ascii_case("true") => Some(true),
+        Ok(v) if v == "0" || v.eq_ignore_ascii_case("false") => Some(false),
+        _ => None,
+    }
+}
+
 /// Additional, configurable context the `Cheatcodes` inspector has access to
 ///
 /// This is essentially a subset of various `Config` settings `Cheatcodes` needs to know.
@@ -105,7 +123,8 @@ impl CheatsConfig {
             if config.unchecked_cheatcode_artifacts { None } else { available_artifacts };
 
         Self {
-            ffi: evm_opts.ffi,
+            // `FOUNDRY_FFI`, when set, authoritatively overrides the configured value and `--ffi`.
+            ffi: ffi_from_env().unwrap_or(evm_opts.ffi),
             disable_external_cheatcodes: external_cheatcodes_disabled_from_env(),
             always_use_create_2_factory: evm_opts.always_use_create_2_factory,
             batch_rewrite_creates,

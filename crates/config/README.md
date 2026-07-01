@@ -86,3 +86,13 @@ Unlike most settings, this flag is read directly from the environment and is **n
 configuration layering: it cannot be set or overridden through `foundry.toml`. In particular, it takes
 effect even when `ffi = true` is configured or `--ffi` is passed, so it can be used to sandbox test
 execution from the host.
+
+### `FOUNDRY_FFI`
+
+`FOUNDRY_FFI` authoritatively controls the FFI cheatcode. When set to a boolean (`1`/`true` or
+`0`/`false`) it enables or disables FFI and takes precedence over both the `foundry.toml` `ffi`
+setting and the `--ffi` flag; when unset, `foundry.toml`/`--ffi` decide as before.
+
+Like `FOUNDRY_DISABLE_EXTERNAL_CHEATCODES`, it is read directly from the environment rather than
+through the configuration layering, so it cannot be overridden by `foundry.toml`. (For this reason it
+does not appear in `forge config` output.)
