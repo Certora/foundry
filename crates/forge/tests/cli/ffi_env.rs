@@ -42,14 +42,14 @@ forgetest!(foundry_ffi_env_disables_over_flag, |prj, cmd| {
 Compiler run successful!
 
 Ran 1 test for src/FfiEnv.t.sol:FfiEnvTest
-[FAIL: vm.ffi: FFI is disabled; add the `--ffi` flag to allow tests to call external commands] testFfiEcho() ([GAS])
+[FAIL: vm.ffi: FFI is disabled by `FOUNDRY_FFI=false`, which overrides the `--ffi` flag and `foundry.toml`] testFfiEcho() ([GAS])
 Suite result: FAILED. 0 passed; 1 failed; 0 skipped; [ELAPSED]
 
 Ran 1 test suite [ELAPSED]: 0 tests passed, 1 failed, 0 skipped (1 total tests)
 
 Failing tests:
 Encountered 1 failing test in src/FfiEnv.t.sol:FfiEnvTest
-[FAIL: vm.ffi: FFI is disabled; add the `--ffi` flag to allow tests to call external commands] testFfiEcho() ([GAS])
+[FAIL: vm.ffi: FFI is disabled by `FOUNDRY_FFI=false`, which overrides the `--ffi` flag and `foundry.toml`] testFfiEcho() ([GAS])
 
 Encountered a total of 1 failing tests, 0 tests succeeded
 

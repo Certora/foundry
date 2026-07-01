@@ -40,7 +40,7 @@ pub const FFI_ENV: &str = "FOUNDRY_FFI";
 
 /// Reads [`FFI_ENV`] from the process environment, returning `None` when unset or not a recognized
 /// boolean so the configured value (`foundry.toml` / `--ffi`) is used instead.
-fn ffi_from_env() -> Option<bool> {
+pub(crate) fn ffi_from_env() -> Option<bool> {
     match std::env::var(FFI_ENV) {
         Ok(v) if v == "1" || v.eq_ignore_ascii_case("true") => Some(true),
         Ok(v) if v == "0" || v.eq_ignore_ascii_case("false") => Some(false),
