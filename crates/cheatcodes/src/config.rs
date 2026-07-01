@@ -13,6 +13,41 @@ use std::{
     time::Duration,
 };
 
+/// Environment variable that, when set to a truthy value (`1` or `true`), forces external
+/// cheatcodes to revert instead of executing.
+///
+/// "External" here means cheatcodes that reach outside the EVM sandbox to the host: the
+/// [`Filesystem`](spec::Group::Filesystem) group (`ffi`, file I/O, prompts, on-disk artifact and
+/// code reads) and the [`Environment`](spec::Group::Environment) group (env var reads and writes).
+///
+/// This is read directly from the process environment and is intentionally *not* part of the
+/// figment config layering, so it cannot be overridden or re-enabled via `foundry.toml`.
+pub const DISABLE_EXTERNAL_CHEATCODES_ENV: &str = "FOUNDRY_DISABLE_EXTERNAL_CHEATCODES";
+
+/// Reads [`DISABLE_EXTERNAL_CHEATCODES_ENV`] from the process environment.
+fn external_cheatcodes_disabled_from_env() -> bool {
+    std::env::var(DISABLE_EXTERNAL_CHEATCODES_ENV)
+        .is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+}
+
+/// Environment variable that authoritatively controls the FFI cheatcode.
+///
+/// When set to a boolean (`1`/`true` or `0`/`false`), it enables or disables FFI and takes
+/// precedence over both `foundry.toml` (`ffi = ...`) and the `--ffi` flag. Like
+/// [`DISABLE_EXTERNAL_CHEATCODES_ENV`], it is read directly from the process environment and is not
+/// part of the figment config layering, so it cannot be overridden via `foundry.toml`.
+pub const FFI_ENV: &str = "FOUNDRY_FFI";
+
+/// Reads [`FFI_ENV`] from the process environment, returning `None` when unset or not a recognized
+/// boolean so the configured value (`foundry.toml` / `--ffi`) is used instead.
+fn ffi_from_env() -> Option<bool> {
+    match std::env::var(FFI_ENV) {
+        Ok(v) if v == "1" || v.eq_ignore_ascii_case("true") => Some(true),
+        Ok(v) if v == "0" || v.eq_ignore_ascii_case("false") => Some(false),
+        _ => None,
+    }
+}
+
 /// Additional, configurable context the `Cheatcodes` inspector has access to
 ///
 /// This is essentially a subset of various `Config` settings `Cheatcodes` needs to know.
@@ -20,6 +55,16 @@ use std::{
 pub struct CheatsConfig {
     /// Whether the FFI cheatcode is enabled.
     pub ffi: bool,
+    /// Whether FFI was disabled by an explicit `FOUNDRY_FFI=false`, which overrides `--ffi` and
+    /// `foundry.toml`. Captured at construction so the revert message can name the actual cause
+    /// even if the process environment is mutated later (e.g. via `vm.setEnv`).
+    pub ffi_disabled_by_env: bool,
+    /// Whether external cheatcodes (the `Filesystem` and `Environment` groups) are disabled and
+    /// must revert instead of executing.
+    ///
+    /// Controlled exclusively by the [`DISABLE_EXTERNAL_CHEATCODES_ENV`] environment variable; it
+    /// is not configurable via `foundry.toml`.
+    pub disable_external_cheatcodes: bool,
     /// Use the create 2 factory in all cases including tests and non-broadcasting scripts.
     pub always_use_create_2_factory: bool,
     /// Rewrite plain CREATE to CREATE2 for `forge script --batch`.
@@ -81,8 +126,13 @@ impl CheatsConfig {
         let available_artifacts =
             if config.unchecked_cheatcode_artifacts { None } else { available_artifacts };
 
+        // `FOUNDRY_FFI`, when set, authoritatively overrides the configured value and `--ffi`.
+        let ffi_env = ffi_from_env();
+
         Self {
-            ffi: evm_opts.ffi,
+            ffi: ffi_env.unwrap_or(evm_opts.ffi),
+            ffi_disabled_by_env: ffi_env == Some(false),
+            disable_external_cheatcodes: external_cheatcodes_disabled_from_env(),
             always_use_create_2_factory: evm_opts.always_use_create_2_factory,
             batch_rewrite_creates,
             prompt_timeout: Duration::from_secs(config.prompt_timeout),
@@ -148,6 +198,13 @@ impl CheatsConfig {
         path: impl AsRef<Path>,
         kind: FsAccessKind,
     ) -> Result<PathBuf> {
+        // Backstop for the dispatch-level gate in `apply_dispatch`: any cheatcode doing path-based
+        // I/O funnels through here, so host file access stays blocked even for cheatcodes the
+        // dispatch gate does not classify as external (e.g. ones added upstream later).
+        ensure!(
+            !self.disable_external_cheatcodes,
+            "external cheatcodes are disabled by `{DISABLE_EXTERNAL_CHEATCODES_ENV}`"
+        );
         let path = path.as_ref();
         let normalized = self.normalized_path(path);
         ensure!(
@@ -226,6 +283,8 @@ impl Default for CheatsConfig {
     fn default() -> Self {
         Self {
             ffi: false,
+            ffi_disabled_by_env: false,
+            disable_external_cheatcodes: false,
             always_use_create_2_factory: false,
             batch_rewrite_creates: false,
             prompt_timeout: Duration::from_secs(120),

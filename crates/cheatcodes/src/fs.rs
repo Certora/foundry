@@ -797,10 +797,17 @@ fn read_dir<FEN: FoundryEvmNetwork>(
 }
 
 fn ffi<FEN: FoundryEvmNetwork>(state: &Cheatcodes<FEN>, input: &[String]) -> Result<FfiResult> {
-    ensure!(
-        state.config.ffi,
-        "FFI is disabled; add the `--ffi` flag to allow tests to call external commands"
-    );
+    if !state.config.ffi {
+        // An explicit `FOUNDRY_FFI=false` overrides `--ffi` and `foundry.toml`, so pointing at
+        // `--ffi` here would be misleading; give the accurate reason instead.
+        if state.config.ffi_disabled_by_env {
+            bail!(
+                "FFI is disabled by `{}=false`, which overrides the `--ffi` flag and `foundry.toml`",
+                crate::config::FFI_ENV
+            );
+        }
+        bail!("FFI is disabled; add the `--ffi` flag to allow tests to call external commands");
+    }
     ensure!(!input.is_empty() && !input[0].is_empty(), "can't execute empty command");
     let mut cmd = Command::new(&input[0]);
     cmd.args(&input[1..]);

@@ -74,3 +74,32 @@ supported, this means that `FOUNDRY_SRC` and `DAPP_SRC` are equivalent.
 Some exceptions to the above are [explicitly ignored](https://github.com/foundry-rs/foundry/blob/10440422e63aae660104e079dfccd5b0ae5fd720/config/src/lib.rs#L1539-L15522) due to security concerns.
 
 Environment variables take precedence over values in `foundry.toml`. Values are parsed as a loose form of TOML syntax.
+
+### `FOUNDRY_DISABLE_EXTERNAL_CHEATCODES`
+
+Setting `FOUNDRY_DISABLE_EXTERNAL_CHEATCODES` to a truthy value (`1` or `true`) forces all "external"
+cheatcodes — those that reach outside the EVM sandbox to the host — to revert instead of executing.
+This covers the `Filesystem` group (`ffi`, file I/O, prompts, on-disk artifact and code reads), the
+`Environment` group (env var reads and writes), and host-touching cheatcodes from other groups:
+`writeJson`, `writeToml`, `dumpState`, `loadAllocs`, and the file-reading `eip712HashType`/
+`eip712HashStruct` overloads (the ones taking a bindings path). As a backstop, any cheatcode
+performing path-based file I/O is also blocked at the filesystem-permission check.
+
+Deliberately not covered: network access (forking, `rpc`, `eth_getLogs`), `rpcUrl`/`rpcUrls`
+(endpoint resolution may interpolate `${VAR}` env references from the project's own `foundry.toml`),
+and `sleep`.
+
+Unlike most settings, this flag is read directly from the environment and is **not** part of the
+configuration layering: it cannot be set or overridden through `foundry.toml`. In particular, it takes
+effect even when `ffi = true` is configured or `--ffi` is passed, so it can be used to sandbox test
+execution from the host.
+
+### `FOUNDRY_FFI`
+
+`FOUNDRY_FFI` authoritatively controls the FFI cheatcode. When set to a boolean (`1`/`true` or
+`0`/`false`) it enables or disables FFI and takes precedence over both the `foundry.toml` `ffi`
+setting and the `--ffi` flag; when unset, `foundry.toml`/`--ffi` decide as before.
+
+Like `FOUNDRY_DISABLE_EXTERNAL_CHEATCODES`, it is read directly from the environment rather than
+through the configuration layering, so it cannot be overridden by `foundry.toml`. (For this reason it
+does not appear in `forge config` output.)

@@ -16,9 +16,11 @@ mod context;
 mod coverage;
 mod create;
 mod debug;
+mod disable_external_cheatcodes;
 mod doc;
 mod eip712;
 mod failure_assertions;
+mod ffi_env;
 mod inline_config;
 mod install;
 

@@ -3035,6 +3035,32 @@ const fn cheatcode_signature(cheat: &spec::Cheatcode<'static>) -> &'static str {
     cheat.func.signature
 }
 
+/// Cheatcodes outside the `Filesystem`/`Environment` groups that nevertheless access the host
+/// filesystem, so `FOUNDRY_DISABLE_EXTERNAL_CHEATCODES` must cover them too. `dumpState` and
+/// `loadAllocs` (`Evm` group) take arbitrary paths without even consulting `fs_permissions`; the
+/// rest write or read files through the regular fs helpers. Only the file-reading `eip712Hash*`
+/// overloads (the ones taking a bindings path) are listed; their pure overloads stay allowed.
+const EXTERNAL_CHEATCODE_IDS: &[&str] = &[
+    "dumpState",
+    "loadAllocs",
+    "writeJson_0",
+    "writeJson_1",
+    "writeToml_0",
+    "writeToml_1",
+    "eip712HashType_1",
+    "eip712HashStruct_1",
+];
+
+/// What an external cheatcode accesses ("filesystem" or "environment"), or `None` if the cheatcode
+/// does not interact with the host.
+fn external_access_kind(cheat: &spec::Cheatcode<'static>) -> Option<&'static str> {
+    match cheat.group {
+        spec::Group::Filesystem => Some("filesystem"),
+        spec::Group::Environment => Some("environment"),
+        _ => EXTERNAL_CHEATCODE_IDS.contains(&cheat.func.id).then_some("filesystem"),
+    }
+}
+
 /// Dispatches the cheatcode call to the appropriate function.
 fn apply_dispatch<FEN: FoundryEvmNetwork>(
     calls: &Vm::VmCalls,
@@ -3056,6 +3082,21 @@ fn apply_dispatch<FEN: FoundryEvmNetwork>(
 
     if let spec::Status::Deprecated(replacement) = cheat.status {
         ccx.state.deprecated.insert(cheatcode_signature(cheat), replacement);
+    }
+
+    // External cheatcodes reach outside the EVM sandbox to the host (filesystem/OS and
+    // environment access). They can be disabled entirely via the
+    // `FOUNDRY_DISABLE_EXTERNAL_CHEATCODES` environment variable, e.g. to sandbox test execution.
+    // This gate is driven by the environment and cannot be re-enabled via `foundry.toml`.
+    if let Some(kind) = external_access_kind(cheat) {
+        // `ensure!` returns early, skipping the `vm.<name>: ` prefixing applied to dispatched
+        // errors below, so name the cheatcode explicitly here.
+        ensure!(
+            !ccx.state.config.disable_external_cheatcodes,
+            "external cheatcodes are disabled by `{}`: `vm.{}` accesses the {kind}",
+            crate::config::DISABLE_EXTERNAL_CHEATCODES_ENV,
+            cheatcode_name(cheat),
+        );
     }
 
     // Monomorphized dispatch: calls apply_full directly, no trait objects.
