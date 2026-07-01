@@ -29,6 +29,22 @@ forgetest!(foundry_ffi_env_enables_without_flag, |prj, cmd| {
     cmd.args(["test", "--match-test", "testFfiEcho"]).assert_success();
 });
 
+// `FOUNDRY_FFI=false` disables FFI even when `foundry.toml` sets `ffi = true`.
+forgetest!(foundry_ffi_env_disables_over_toml, |prj, cmd| {
+    prj.insert_ds_test();
+    prj.add_source("FfiEnv.t.sol", FFI_ECHO_CONTRACT);
+    prj.update_config(|config| config.ffi = true);
+    cmd.env("FOUNDRY_FFI", "false");
+    cmd.args(["test", "--match-test", "testFfiEcho"])
+        .assert_failure()
+        .stdout_eq(str![[r#"
+...
+[FAIL: vm.ffi: FFI is disabled by `FOUNDRY_FFI=false`, which overrides the `--ffi` flag and `foundry.toml`] testFfiEcho() ([GAS])
+...
+
+"#]]);
+});
+
 // `FOUNDRY_FFI=false` disables FFI even when `--ffi` is passed.
 forgetest!(foundry_ffi_env_disables_over_flag, |prj, cmd| {
     prj.insert_ds_test();

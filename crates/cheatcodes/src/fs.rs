@@ -800,7 +800,7 @@ fn ffi<FEN: FoundryEvmNetwork>(state: &Cheatcodes<FEN>, input: &[String]) -> Res
     if !state.config.ffi {
         // An explicit `FOUNDRY_FFI=false` overrides `--ffi` and `foundry.toml`, so pointing at
         // `--ffi` here would be misleading; give the accurate reason instead.
-        if crate::config::ffi_from_env() == Some(false) {
+        if state.config.ffi_disabled_by_env {
             bail!(
                 "FFI is disabled by `{}=false`, which overrides the `--ffi` flag and `foundry.toml`",
                 crate::config::FFI_ENV

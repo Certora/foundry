@@ -79,8 +79,15 @@ Environment variables take precedence over values in `foundry.toml`. Values are 
 
 Setting `FOUNDRY_DISABLE_EXTERNAL_CHEATCODES` to a truthy value (`1` or `true`) forces all "external"
 cheatcodes — those that reach outside the EVM sandbox to the host — to revert instead of executing.
-This covers the `Filesystem` group (`ffi`, file I/O, prompts, on-disk artifact and code reads) and the
-`Environment` group (env var reads and writes).
+This covers the `Filesystem` group (`ffi`, file I/O, prompts, on-disk artifact and code reads), the
+`Environment` group (env var reads and writes), and host-touching cheatcodes from other groups:
+`writeJson`, `writeToml`, `dumpState`, `loadAllocs`, and the file-reading `eip712HashType`/
+`eip712HashStruct` overloads (the ones taking a bindings path). As a backstop, any cheatcode
+performing path-based file I/O is also blocked at the filesystem-permission check.
+
+Deliberately not covered: network access (forking, `rpc`, `eth_getLogs`), `rpcUrl`/`rpcUrls`
+(endpoint resolution may interpolate `${VAR}` env references from the project's own `foundry.toml`),
+and `sleep`.
 
 Unlike most settings, this flag is read directly from the environment and is **not** part of the
 configuration layering: it cannot be set or overridden through `foundry.toml`. In particular, it takes
